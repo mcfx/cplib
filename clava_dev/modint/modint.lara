@@ -328,6 +328,7 @@ aspectdef applyModint
 end
 
 aspectdef main
+	cmd('bash',['gen.sh']);
 	call applyModint();
 	select program end
 	apply
