@@ -72,7 +72,6 @@ function getBits(l, r) {
 	return 100000;
 }
 
-// todo: fit int128
 function getLiteral(x) {
 	var bits = getBits(0, x);
 	if (bits <= 32) return ''+x+'u';
