@@ -1,0 +1,337 @@
+function getTypeBits(x){
+	if (x.startsWith('unsigned'))x=x.substr(9);
+	if (x.startsWith('signed'))x=x.substr(7);
+	if (x=='char')return 8;
+	if (x=='short')return 16;
+	if (x=='int')return 32;
+	if (x=='long long')return 64;
+	if (x=='__int128'||x=='__int128_t'||x=='__uint128'||x=='__uint128_t')return 128;
+	if (x.startsWith('int')&&x.endsWith('_t'))return parseInt(x.substr(3,x.length-5));
+	if (x.startsWith('uint')&&x.endsWith('_t'))return parseInt(x.substr(4,x.length-6));
+	return 0;
+}
+
+function getBitsType(x,signed){
+	var signedPrefix = signed ? 'signed ' : 'unsigned ';
+	if(x==8)return signedPrefix + 'char';
+	if(x==16)return signedPrefix + 'short';
+	if(x==32)return signedPrefix + 'int';
+	if(x==64)return signedPrefix + 'long long';
+	if(x==128)return signed ? '__int128_t' : '__uint128_t';
+	return 'TYPE_TOO_BIG';
+}
+
+function fixTemplateArgs(x){
+	return [
+		getTypeBits(x[0]),
+		BigInt(x[1]),
+		getTypeBits(x.length>2 ? x[2] : 'long long'),
+	];
+}
+
+function mintType(x){
+	if(x.kind=='RecordType'){
+		var typeDef=x.getValue('typeAsString');
+		//println(typeDef);
+		if(typeDef.startsWith('Mint<')&&typeDef.endsWith('>')){
+			return [true,fixTemplateArgs(typeDef.substr(5,typeDef.length-6).split(', '))];
+		}
+		return [false,null];
+	}else if(x.kind=='TypedefType'){
+		if(x.underlyingType.templateName=='Mint'){
+			var args=x.underlyingType.templateArgsStrings;
+			return [true,fixTemplateArgs(args)];
+		}
+		return [false,null];
+	}
+	return [false,null];
+}
+
+// return x,y s.t. ax+by=1
+function exgcd(a, b) {
+	if (!b) return [1,0];
+	var t=exgcd(b,a%b),x=t[0],y=t[1];
+	x-=y*~~(a/b);
+	return [y,x];
+}
+
+function invert(x, n) {
+	var t=exgcd(n, x);
+	return (t[1]%n+n)%n;
+}
+
+function getBits(l, r) {
+	var ls = [8,16,32,64,128];
+	if (l >= 0) {
+		for (var i=0;i<ls.length;i++)
+			if (!(r>>BigInt(ls[i]))) return ls[i];
+	} else {
+		for (var i=0;i<ls.length;i++)
+			if (!(r>>BigInt(ls[i]-1))&&!(Bigint(-1)-l>>BigInt(ls[i]-1))) return ls[i];
+	}
+	return 100000;
+}
+
+// todo: fit int128
+function getLiteral(x) {
+	var bits = getBits(0, x);
+	if (bits <= 32) return ''+x+'u';
+	if (bits == 64) return ''+x+'ull';
+	if (bits == 128) {
+		var tp = getBitsType(128, false);
+		return '(('+tp+')'+(x>>BigInt(64))+'ull<<64|('+tp+')'+(x&(BigInt(1)<<BigInt(64))-BigInt(1))+')';
+	}
+	return 'TOO_BIG_LITERAL';
+}
+
+var needFuncs = {};
+var needBits = {};
+
+// returns: [l, r, modCnt, code, innerRef]
+function processMod(node, modConfig, forceMod){
+	//println(node.code + '|' + modConfig + '|' + forceMod);
+	node.setUserField('process_mod', true);
+	var fieldKey = 'process_mod_'+(+forceMod);
+	if(node.userField(fieldKey))return node.userField(fieldKey);
+	var opPlus = '+', opMinus = '-', opMul = String.fromCharCode(42), opDiv = '/';
+	var ops = opPlus + opMinus + opMul + opDiv;
+	function processOp(op, lc, rc){
+		var ls = [processMod(lc, modConfig, false), processMod(lc, modConfig, true)];
+		var rs = [processMod(rc, modConfig, false), processMod(rc, modConfig, true)];
+		var res = null, minModCnt = 100000;
+		for (var i=0; i<2; i++) for (var j=0; j<2; j++) {
+			var lt=ls[i], rt=rs[j], nl, nr;
+			var rl=rt[0], rr=rt[1], rc=rt[3], kop = op;
+			if (op == opDiv) {
+				kop = opMul;
+				if (rt[0] == rt[1]) {
+					rl = rr = invert(parseInt(rt[0]));
+					kop = ''+rl;
+				} else {
+					rl = BigInt(0), rr = modConfig[1] - BigInt(1);
+					rc = 'inv_'+modConfig[1]+'('+rc+')';
+					needFuncs['inv_'+modConfig[1]]=true;
+				}
+			}
+			if (op == opPlus) {
+				nl = lt[0] + rl, nr = lt[1] + rr;
+			} else if (op == opMinus) {
+				nl = lt[0] - rr, nr = lt[1] - rl;
+			} else if (op == opMul || op == opDiv) {
+				nl = nr = lt[0] * rt[0];
+				var lu = [lt[0], lt[1]], ru = [rl, rr];
+				if (lt[0] <= 0 && lt[1] >= 0) lu.push(BigInt(0));
+				if (rl <= 0 && rr >= 0) ru.push(BigInt(0));
+				for(var x=0;x<lu.length;x++)for(var y=0;y<ru.length;y++)
+				{
+					var v=lu[x]*ru[y];
+					if(v<nl)nl=v;
+					if(v>nr)nr=v;
+				}
+			}
+			if (!forceMod || (nl >= 0 && nr < modConfig[1])) {
+				var rawBits = getBits(nl, nr);
+				if (rawBits <= modConfig[2]) {
+					var modCnt = lt[2] + rt[2];
+					if (modCnt <= minModCnt) {
+						minModCnt = modCnt;
+						var tp = getBitsType(rawBits, nl<0);
+						var code = '(('+tp+')('+lt[3]+')'+kop+'('+tp+')('+rc+'))';
+						res = [nl, nr, modCnt, code, lt[4]];
+					}
+				}
+			} else {
+				var lshift = nl >= 0 ? BigInt(0) : (modConfig[1] - BigInt(1) - nl) / modConfig[1];
+				var rawBits = getBits(nl + lshift * modConfig[1], nr + lshift * modConfig[1]);
+				if (rawBits <= modConfig[2]) {
+					var modCnt = lt[2] + rt[2] + 1;
+					if (modCnt <= minModCnt) {
+						minModCnt = modCnt;
+						var tp = getBitsType(rawBits, nl<0), utp = getBitsType(rawBits, false);
+						var code = '(('+tp+')('+lt[3]+')'+kop+'('+tp+')('+rc+'))';
+						var code = '(('+(tp!=utp?'('+utp+')':'')+code+(lshift==0?'':'+'+getLiteral(lshift * modConfig[1]))+')%'+modConfig[1]+')';
+						res = [BigInt(0), modConfig[1] - BigInt(1), modCnt, code, lt[4]];
+					}
+				}
+			}
+		}
+		if (res == null) {
+			println('ERROR: no solution found');
+		}
+		return res;
+	}
+	var mt = mintType(node.type);
+	if (mt[0]) {
+		modConfig = mt[1];
+		needBits[modConfig[0]] = true;
+		if ( node.instanceOf('unaryOp') ||
+			node.instanceOf('memberAccess') ||
+			node.instanceOf('arrayAccess')) {
+			return [BigInt(0), modConfig[1] - BigInt(1), 0, node.code, node.code];
+		}
+		if (node.instanceOf('varref')) {
+			//println(node.children);
+			return [BigInt(0), modConfig[1] - BigInt(1), 0, node.code, node.code];
+		}
+		if (node.instanceOf('call') && ops.indexOf(node.children[0].code) != -1) {
+			var res = processOp(node.children[0].code, node.children[1], node.children[2]);
+			res[4] = 'RVALUE';
+			node.setUserField(fieldKey, res);
+			return res;
+		}
+		if (node.instanceOf('call') && node.children[0].code.indexOf('::') != -1 && node.children[0].name == 'mod') {
+			// may recognize other functions as Mint::mod, be careful
+			var inner = node.children[1];
+			if (inner.instanceOf('literal')) {
+				var val = (BigInt(parseInt(inner.code)) % modConfig[1] + modConfig[1]) % modConfig[1];
+				return [val, val, 0, getLiteral(val), 'RVALUE'];
+			}
+			return [BigInt(0), modConfig[1] - BigInt(1), 0, '((('+inner.code+')%'+modConfig[1]+'+'+modConfig[1]+')%'+modConfig[1]+')', 'RVALUE'];
+		}
+		if (node.instanceOf('call')) {
+			return [BigInt(0), modConfig[1] - BigInt(1), 0, node.code, 'RVALUE'];
+		}
+		if (node.children.length == 1) {
+			return processMod(node.children[0], modConfig, forceMod);
+		}
+		println('Unknown type 1: '+node.code+'|'+node+'|'+node.type);
+		return [BigInt(0), modConfig[1] - BigInt(1), 0, node.code, node.code];
+	} else if(node.instanceOf('call') && node.children[0].type.code == 'Mint & (Mint)') {
+		var funcCode = node.children[0].code;
+		if (funcCode == '=') {
+			var lt = processMod(node.children[1], modConfig, false);
+			var rt = processMod(node.children[2], modConfig, true);
+			rt[3] = lt[4] + '=(' + rt[3] +')';
+			rt[4] = lt[4];
+			return rt;
+		}
+		if (funcCode.length != 2 || funcCode[1] != '=') {
+			// user defined functions, ignored
+			return [BigInt(0), modConfig[1] - BigInt(1), 0, node.code, node.code];
+		}
+		forceMod = true;
+		var res = processOp(funcCode[0], node.children[1], node.children[2]);
+		res[3] = res[4] + '=(' + res[3] +')';
+		node.setUserField(fieldKey, res);
+		return res;
+	} else if(node.instanceOf('call') || node.instanceOf('memberCall')) {
+		return [BigInt(0), modConfig[1] - BigInt(1), 0, node.code, node.code];
+	} else if(node.instanceOf('varref')) {
+		return [BigInt(0), modConfig[1] - BigInt(1), 0, node.code, node.code];
+	} else if(node.instanceOf('literal')) {
+		var val = BigInt(parseInt(node.code));
+		return [val, val, 0, node.code, 'RVALUE'];
+	} else if(node.children.length == 1) {
+		var res = processMod(node.children[0], modConfig, forceMod);
+		res[3] = '('+res[3]+')';
+		return res;
+	} else {
+		//println('Debug: '+node+'|'+node.ast);
+		println('Unknown type 2: '+node.code+'|'+node);
+		return [BigInt(0), modConfig[1] - BigInt(1), 0, node.code, node.code];
+	}
+}
+
+function processModOut(node){
+	if (node.userField('process_mod')) return null;
+	var mt = mintType(node.type);
+	if (mt[0]) {
+		if (node.code == node.type.code) return null;
+		needBits[mt[1][0]] = true;
+		return processMod(node, mt[1], true)[3];
+	}
+	if (node.instanceOf('call') && node.children[0].type.code == 'Mint & (Mint)') {
+		var funcCode = node.children[0].code;
+		if (funcCode != '=' && (funcCode.length != 2 || funcCode[1] != '=')) {
+			// user defined functions, ignored
+			return null;
+		}
+		mt = mintType(node.children[2].type);
+		if (mt[0]) {
+			needBits[mt[1][0]] = true;
+			return processMod(node, mt[1], true)[3];
+		}
+		println('ERROR: no mod template found in Mint operator calls');
+		return null;
+	}
+	return null;
+}
+
+aspectdef applyModint
+	select expr end
+	apply
+		//println($expr.type);
+		//println($expr.code+'|||'+$expr.parent.code);
+		/*if($expr.code=='mint'){
+			println($expr.code+'|||'+$expr.type.code);
+		}*/
+		if (!$expr.userField('process_mod')) {
+			var newCode=processModOut($expr);
+			if(newCode){
+				println($expr.code+' ||| '+newCode);
+				$expr.insert replace(newCode);
+			}
+		}
+		//println($expr.code+','+$expr.type.kind+','+$expr.type);
+		//println($expr.code+' '+mintType($expr.type)+' '+$expr+' '+$expr.instanceOf('varref'));
+		//if($expr.code=='work2(c)')
+		//println($expr.type.kind+'|'+$expr.type.descendants+'|'+$expr.children);
+		/*if($expr.code=='c += 2'||$expr.code=='a * a'||$expr.code=='e + 1ll'){
+			println($expr.children[0].type.code);
+			println($expr.instanceOf('call'));
+		}
+		if($expr.code=='11111'||$expr.code=='(111)'){
+			println($expr.code+'|'+$expr+'|'+$expr.type+'|'+$expr.children);
+			println($expr.instanceOf('literal'));
+		}*/
+		/*if($expr.type.kind=='RecordType'){
+			println($expr.type.keys);
+			println($expr.type.getValue('typeAsString'));
+		}else if($expr.type.kind=='TypedefType'){
+			println($expr.type.underlyingType.templateArgsStrings);
+		}*/
+		//if($expr.code.length>10)
+		/*if($expr.code=='a * a * a * a * a')
+		{
+			//$expr.insertBefore('(');
+			//$expr.insertAfter(')');
+			$expr.insert replace 'fafa';
+		}*/
+	end
+
+	select struct{'Mint'} end
+	apply
+		var code = 'template<typename T,T P,typename U=T>struct Mint{};';
+		for (var b in needBits) {
+			for (var sg of [true, false]) {
+				var tp = getBitsType(b, sg);
+				code += %{template<[[tp]] P,typename U>struct Mint<[[tp]],P,U>{[[tp]] v;Mint(){}Mint([[tp]] x):v(x){}operator [[tp]]()const{return v;}};}%;
+			}
+		}
+		//println(code);
+		//println($struct.replaceWith('XXX').code);
+		println($struct.parent.replaceWith(code));
+	end
+
+	select program.file end
+	apply
+		for(var funcName in needFuncs) {
+			if(funcName.startsWith('inv_')) {
+				var P = BigInt(funcName.substr(4)), b = getBits(BigInt(0), P), b2 = getBits(BigInt(0), P*P);
+				// todo: P not prime
+				var code = 'T F(T a){T b=P-2,r=1;for(;b;b>>=1,a=(U)a*a%P)if(b&1)r=(U)r*a%P;return r;}';
+				code = code.replace(/T/g,getBitsType(b,false)).replace(/U/g,getBitsType(b2, false)).replace(/P/g,getLiteral(P)).replace(/F/g,funcName);
+
+				$file.insertBegin(code);
+			}
+		}
+	end
+end
+
+aspectdef main
+	call applyModint();
+	select program end
+	apply
+		println($program.code);
+	end
+end
