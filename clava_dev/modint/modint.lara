@@ -32,13 +32,15 @@ function fixTemplateArgs(x){
 function mintType(x){
 	if(x.kind=='RecordType'){
 		var typeDef=x.getValue('typeAsString');
-		//println(typeDef);
+		//println('typeDefinition:'+typeDef);
 		if(typeDef.startsWith('Mint<')&&typeDef.endsWith('>')){
 			return [true,fixTemplateArgs(typeDef.substr(5,typeDef.length-6).split(', '))];
 		}
 		return [false,null];
 	}else if(x.kind=='TypedefType'){
 		if(x.underlyingType.templateName=='Mint'){
+			//println('underlying:'+x.underlyingType.templateArgsStrings);
+			//println('underlying:'+x.underlyingType.ast);
 			var args=x.underlyingType.templateArgsStrings;
 			return [true,fixTemplateArgs(args)];
 		}
@@ -239,6 +241,19 @@ function processModOut(node){
 		needBits[mt[1][0]] = true;
 		return processMod(node, mt[1], true)[3];
 	}
+	/*if (node.instanceOf('memberCall')) {
+		// process Mint.val()
+		var child = node.children[0];
+		if (child.memberChainNames[child.memberChainNames.length - 1] == 'val') {
+			var mt = mintType(child.children[0].type);
+			if (mt[0]) {
+				node.setUserField('process_mod', true);
+				child.setUserField('process_mod', true);
+				var tp = getBitsType(mt[1][0]);
+				return '('+tp+')('+child.children[0].code+')';
+			}
+		}
+	}*/
 	if (node.instanceOf('call') && node.children[0].type.code == 'Mint & (Mint)') {
 		var funcCode = node.children[0].code;
 		if (funcCode != '=' && (funcCode.length != 2 || funcCode[1] != '=')) {
@@ -271,7 +286,13 @@ aspectdef applyModint
 				$expr.insert replace(newCode);
 			}
 		}
-		//println($expr.code+','+$expr.type.kind+','+$expr.type);
+		/*if ($expr.code=='a.d.val()'){
+			println($expr.code+','+$expr+','+$expr.type.kind+','+$expr.type);
+			println($expr.children[0]+','+$expr.children[0].memberChainNames[1]);
+			println(mintType($expr.children[0].children[0].type));
+			//println($expr.children[0].code);
+			//println($expr.children[1]);
+		}*/
 		//println($expr.code+' '+mintType($expr.type)+' '+$expr+' '+$expr.instanceOf('varref'));
 		//if($expr.code=='work2(c)')
 		//println($expr.type.kind+'|'+$expr.type.descendants+'|'+$expr.children);
@@ -304,12 +325,12 @@ aspectdef applyModint
 		for (var b in needBits) {
 			for (var sg of [true, false]) {
 				var tp = getBitsType(b, sg);
-				code += %{template<[[tp]] P,typename U>struct Mint<[[tp]],P,U>{[[tp]] v;Mint(){}Mint([[tp]] x):v(x){}operator [[tp]]()const{return v;}};}%;
+				code += %{template<[[tp]] P,typename U>struct Mint<[[tp]],P,U>{[[tp]] v;Mint(){}Mint([[tp]] x):v(x){}operator [[tp]]()const{return v;}[[tp]] val()const{return v;}};}%;
 			}
 		}
 		//println(code);
 		//println($struct.replaceWith('XXX').code);
-		println($struct.parent.replaceWith(code));
+		$struct.parent.replaceWith(code);
 	end
 
 	select program.file end
@@ -328,7 +349,7 @@ aspectdef applyModint
 end
 
 aspectdef main
-	cmd('bash',['gen.sh']);
+	//cmd('bash',['/mnt/d/proj/cplib/clava_dev/modint/gen.sh']);
 	call applyModint();
 	select program end
 	apply

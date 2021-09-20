@@ -31,6 +31,7 @@ dfs_lib('')
 def clava_work(code, used_libs):
     path = '/tmp/cplib_' + randstr()
     os.mkdir(path)
+    os.chdir(path)
     shutil.copyfile(SRC_ROOT + '/assets/clava.config', path + '/clava.config')
     open(path + '/code.cpp', 'w').write(code)
 
@@ -51,6 +52,7 @@ end
     open(path + '/main.lara', 'w').write(lara_code)
     subprocess.run([config.JAVA11_PATH, '-jar', config.CLAVA_PATH, '-c', path + '/clava.config'])
     res = open(path + '/woven/code.cpp').read()
+    os.chdir(SRC_ROOT)
     shutil.rmtree(path)
     return res
 
@@ -83,4 +85,5 @@ if __name__ == '__main__':
     used_libs = set()
     code = pre_pragma_use(code, used_libs)
     code = clava_work(code, used_libs)
-    print(code)
+    # print(code)
+    open('test_out.cpp', 'w').write(code)

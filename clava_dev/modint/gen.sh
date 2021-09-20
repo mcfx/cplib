@@ -1,3 +1,5 @@
+cd "$( dirname "${BASH_SOURCE[0]}" )"
+
 lead='^\/\/ modint start$'
 tail='^\/\/ modint end$'
 sed -e "/$lead/,/$tail/{ /$lead/{p; r modint.hpp

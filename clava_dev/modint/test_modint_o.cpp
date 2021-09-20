@@ -6,7 +6,7 @@
 
 typedef Mint<int,998244353,__int128_t> mint;
 
-mint s[100];
+/*mint s[100];
 
 mint work(mint x){
     return x+1;
@@ -46,4 +46,24 @@ int main()
 
     c*c-a*a;
     c+c+c-a;
+
+    int uuu=c.val();
+}*/
+
+struct test{mint d;};
+
+int main()
+{
+    mint c;
+    int u=c.val();
+    Mint<unsigned short,55665>d;
+    d+1;
+    int e=d.val();
+    test a;
+    a.d.val();
+    2*c;
+    const int P=998244353;
+    //Mint<int,P> f;
+    //typedef Mint<int,P> mint2;
+    //mint2 g;
 }
