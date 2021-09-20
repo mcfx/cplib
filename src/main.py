@@ -82,8 +82,10 @@ def pre_pragma_use(code, used_libs):
 
 if __name__ == '__main__':
     code = open('test.cpp').read().replace('\r', '\n')
+    prefix_comments = '// Original Code:\n\n' + '\n'.join(map(lambda x: '// ' + x, code.split('\n'))) + '\n' * 2
     used_libs = set()
     code = pre_pragma_use(code, used_libs)
     code = clava_work(code, used_libs)
     # print(code)
+    code = prefix_comments + code
     open('test_out.cpp', 'w').write(code)
