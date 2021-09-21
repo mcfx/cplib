@@ -87,4 +87,7 @@ int main()
 
     uuu y,z;
     y*=z;
+
+    x=x/(x/233);
+    c=c/(c/233);
 }

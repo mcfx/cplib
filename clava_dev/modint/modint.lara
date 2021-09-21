@@ -122,14 +122,14 @@ function processMod(node, modConfig, forceMod){
 				kop = opMul;
 				if (rt[0] == rt[1] && !modConfig[4]) {
 					rl = rr = invert(BigInt(parseInt(rt[0])), modConfig[1]);
-					kop = ''+rl;
+					rc = ''+rl;
 				} else {
 					rl = BigInt(0), rr = modConfig[1] - BigInt(1);
 					if (!modConfig[4]) {
 						rc = 'inv_'+modConfig[1]+'('+rc+')';
 						needFuncs['inv_'+modConfig[1]]=true;
 					} else {
-						rc = 'inv_general_'+modConfig[0]+'('+rc+','+modconfig[3]+')';
+						rc = 'inv_general_'+modConfig[0]+'('+rc+','+modConfig[3]+')';
 						needFuncs['inv_general_'+modConfig[0]]=true;
 					}
 				}
@@ -285,7 +285,7 @@ aspectdef applyModint
 		if (!$expr.userField('process_mod')) {
 			var newCode=processModOut($expr);
 			if(newCode){
-				println($expr.code+' --> '+newCode);
+				println('modint: '+$expr.code+' --> '+newCode);
 				$expr.insert replace(newCode);
 			}
 		}

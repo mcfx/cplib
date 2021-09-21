@@ -163,7 +163,7 @@ def macro_replace(sharps, tokens):
                 cur = curn
         if bcur is None:
             break
-        print(best, len(bcur), gen_code(tokens[bcur[0]:bcur[0] + blen]))
+        print('macro_replace:', best, len(bcur), gen_code(tokens[bcur[0]:bcur[0] + blen]))
         name = randname()
         sharps.append('#define %s %s' % (name, gen_code(tokens[bcur[0]:bcur[0] + blen])))
         tn = []
@@ -194,5 +194,5 @@ def post_process(code, _):
 
 if __name__ == '__main__':
     code = open('../../../include/test_out.cpp').read().replace('\r', '\n')
-    code = post_process(code)
+    code = post_process(code, 0)
     code = open('../../../include/test_out2.cpp', 'w').write(code)
