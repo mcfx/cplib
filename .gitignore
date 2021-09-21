@@ -1,1 +1,5 @@
 **/woven/*
+**/__pycache__/*
+include/test.cpp
+include/test_out.cpp
+include/test_out2.cpp
