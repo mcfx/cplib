@@ -1,0 +1,21 @@
+aspectdef removeComments
+	// can't remove suffix comments
+	select comment end
+	apply
+		//println($comment+$comment.code);
+		$comment.replaceWith('');
+	end
+
+	/*select file.stmt end
+	apply
+		println($stmt+' '+$stmt.code+' '+$stmt.parent.code);
+	end*/
+end
+
+aspectdef main
+	call removeComments();
+	select program end
+	apply
+		println($program.code);
+	end
+end

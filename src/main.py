@@ -18,11 +18,12 @@ def clava_work(code, used_libs):
     lara_aspects = []
     for libname in used_libs:
         lib = libs[libname]
-        lc, la = lib.get_lara_code()
+        lc, la, opt = lib.get_lara_code()
         if lc:
             lara_code.append(lc)
-            lara_aspects.append(la)
-    lara_calls = '\n'.join(map(lambda x: '    call %s();' % x, lara_aspects))
+            lara_aspects.append((opt, la))
+    lara_aspects.sort()
+    lara_calls = '\n'.join(map(lambda x: '    call %s();' % x[1], lara_aspects))
     lara_code.append('''aspectdef main
 %s
 end
@@ -34,6 +35,19 @@ end
     os.chdir(SRC_ROOT)
     shutil.rmtree(path)
     return res
+
+
+def post_process(code, used_libs):
+    s = []
+    for libname in used_libs:
+        lib = libs[libname]
+        p = lib.post_process_priority()
+        if p is not None:
+            s.append((p, lib))
+    s.sort()
+    for _, lib in s:
+        code = lib.post_process(code)
+    return code
 
 
 def get_dummy_cpp_code(libname, used_libs):
@@ -52,10 +66,10 @@ def pre_pragma_use(code, used_libs):
             libname = line[18:]
             res_lines.append(get_dummy_cpp_code(libname, used_libs))
         elif line.startswith('#include"cplib/'):
-            libname = line.strip()[15:-1].replace('/', '.')
+            libname = line.strip()[15:-5].replace('/', '.')
             res_lines.append(get_dummy_cpp_code(libname, used_libs))
         elif line.startswith('#include "cplib/'):
-            libname = line.strip()[16:-1].replace('/', '.')
+            libname = line.strip()[16:-5].replace('/', '.')
             res_lines.append(get_dummy_cpp_code(libname, used_libs))
         else:
             res_lines.append(line)
@@ -64,11 +78,12 @@ def pre_pragma_use(code, used_libs):
 
 
 if __name__ == '__main__':
-    code = open('test.cpp').read().replace('\r', '\n')
-    prefix_comments = '// Original Code:\n\n' + '\n'.join(map(lambda x: '// ' + x, code.split('\n'))) + '\n' * 2
+    code = open('../include/test.cpp').read().replace('\r', '\n')
+    prefix_comments = '// Original Code:\n\n' + '\n'.join(map(lambda x: '// ' + x.replace('\t', ' ' * 4), code.split('\n'))) + '\n' * 2
     used_libs = set()
     code = pre_pragma_use(code, used_libs)
     code = clava_work(code, used_libs)
+    code = post_process(code, used_libs)
     # print(code)
     code = prefix_comments + code
-    open('test_out.cpp', 'w').write(code)
+    open('../include/test_out.cpp', 'w').write(code)
