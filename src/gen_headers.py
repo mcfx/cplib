@@ -9,5 +9,5 @@ if os.path.exists(HEADER_ROOT):
 for libname, lib in libs.items():
     fn = HEADER_ROOT + '/' + libname.replace('.', '/') + '.hpp'
     os.makedirs(os.path.dirname(fn), exist_ok=True)
-    code = lib.get_dummy_cpp_code()
+    code = lib.get_dummy_header_code()
     open(fn, 'w').write(code)

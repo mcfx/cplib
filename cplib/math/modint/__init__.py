@@ -9,7 +9,11 @@ def get_lara_code():
     return s[:s.find('aspectdef main')], 'applyModint'
 
 
-def get_dummy_cpp_code():
+def get_lara_cpp_code():
+    return open(os.path.join(path, 'modint.hpp')).read()
+
+
+def get_dummy_header_code():
     return open(os.path.join(path, 'modint.hpp')).read()
 
 

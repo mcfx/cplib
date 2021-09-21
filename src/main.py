@@ -51,7 +51,7 @@ def post_process(code, used_libs, libs_storage):
 
 
 def pre_pragma_use(code, used_libs, libs_storage):
-    def get_dummy_cpp_code(libname):
+    def get_lara_cpp_code(libname):
         if libname in used_libs:
             return ''
         used_libs.add(libname)
@@ -59,7 +59,7 @@ def pre_pragma_use(code, used_libs, libs_storage):
         lib = libs[libname]
         for name, funcx in lib.pragma_callbacks().items():
             pragma_callbacks[name] = (libname,) + funcx
-        return lib.get_dummy_cpp_code()
+        return lib.get_lara_cpp_code()
     lines = code.split('\n')
     res_lines = []
     pragma_callbacks = {}
@@ -68,13 +68,13 @@ def pre_pragma_use(code, used_libs, libs_storage):
         line = lines[i]
         if line.startswith('#pragma cplib use '):
             libname = line[18:]
-            res_lines.append(get_dummy_cpp_code(libname))
+            res_lines.append(get_lara_cpp_code(libname))
         elif line.startswith('#include"cplib/'):
             libname = line.strip()[15:-5].replace('/', '.')
-            res_lines.append(get_dummy_cpp_code(libname))
+            res_lines.append(get_lara_cpp_code(libname))
         elif line.startswith('#include "cplib/'):
             libname = line.strip()[16:-5].replace('/', '.')
-            res_lines.append(get_dummy_cpp_code(libname))
+            res_lines.append(get_lara_cpp_code(libname))
         elif line.startswith('#pragma cplib '):
             pos = line.find(' ', 14)
             if pos == -1:
