@@ -37,42 +37,62 @@ end
     return res
 
 
-def post_process(code, used_libs):
+def post_process(code, used_libs, libs_storage):
     s = []
     for libname in used_libs:
         lib = libs[libname]
         p = lib.post_process_priority()
         if p is not None:
-            s.append((p, lib))
+            s.append((p, lib, libname))
     s.sort()
-    for _, lib in s:
-        code = lib.post_process(code)
+    for _, lib, libname in s:
+        code = lib.post_process(code, libs_storage[libname])
     return code
 
 
-def get_dummy_cpp_code(libname, used_libs):
-    if libname in used_libs:
-        return ''
-    used_libs.add(libname)
-    lib = libs[libname]
-    return lib.get_dummy_cpp_code()
-
-
-def pre_pragma_use(code, used_libs):
+def pre_pragma_use(code, used_libs, libs_storage):
+    def get_dummy_cpp_code(libname):
+        if libname in used_libs:
+            return ''
+        used_libs.add(libname)
+        libs_storage[libname] = {}
+        lib = libs[libname]
+        for name, funcx in lib.pragma_callbacks().items():
+            pragma_callbacks[name] = (libname,) + funcx
+        return lib.get_dummy_cpp_code()
     lines = code.split('\n')
     res_lines = []
-    for line in lines:
+    pragma_callbacks = {}
+    i = 0
+    while i < len(lines):
+        line = lines[i]
         if line.startswith('#pragma cplib use '):
             libname = line[18:]
-            res_lines.append(get_dummy_cpp_code(libname, used_libs))
+            res_lines.append(get_dummy_cpp_code(libname))
         elif line.startswith('#include"cplib/'):
             libname = line.strip()[15:-5].replace('/', '.')
-            res_lines.append(get_dummy_cpp_code(libname, used_libs))
+            res_lines.append(get_dummy_cpp_code(libname))
         elif line.startswith('#include "cplib/'):
             libname = line.strip()[16:-5].replace('/', '.')
-            res_lines.append(get_dummy_cpp_code(libname, used_libs))
+            res_lines.append(get_dummy_cpp_code(libname))
+        elif line.startswith('#pragma cplib '):
+            pos = line.find(' ', 14)
+            if pos == -1:
+                pos = len(line)
+            tp = line[14:pos]
+            if tp in pragma_callbacks:
+                libname, ptype, func = pragma_callbacks[tp]
+                if ptype == 1:
+                    nline = func(line[pos + 1:], lines[i + 1], code, libs_storage[libname])
+                    res_lines.append(nline)
+                    i += 1
+                else:
+                    raise Exception('unknown pragma callback type')
+            else:
+                raise Exception('unknown pragma')
         else:
             res_lines.append(line)
+        i += 1
     res_code = '\n'.join(res_lines)
     return res_code
 
@@ -81,9 +101,10 @@ if __name__ == '__main__':
     code = open('../include/test.cpp').read().replace('\r', '\n')
     prefix_comments = '// Original Code:\n\n' + '\n'.join(map(lambda x: '// ' + x.replace('\t', ' ' * 4), code.split('\n'))) + '\n' * 2
     used_libs = set()
-    code = pre_pragma_use(code, used_libs)
+    libs_storage = {}
+    code = pre_pragma_use(code, used_libs, libs_storage)
     code = clava_work(code, used_libs)
-    code = post_process(code, used_libs)
+    code = post_process(code, used_libs, libs_storage)
     # print(code)
     code = prefix_comments + code
     open('../include/test_out.cpp', 'w').write(code)

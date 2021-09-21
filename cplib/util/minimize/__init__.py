@@ -185,17 +185,14 @@ def post_process_priority():
     return 1000
 
 
-def post_process(code):
+def post_process(code, _):
     sharps, tokens = tokenize(code)
     sharps, tokens = macro_replace(sharps, tokens)
-    code = '\n'.join(sharps) + '\n' + gen_code(tokens)
+    code = '\n'.join(sharps) + '\n' + gen_code(tokens) + '\n'
     return code
 
 
 if __name__ == '__main__':
     code = open('../../../include/test_out.cpp').read().replace('\r', '\n')
-    sharps, tokens = tokenize(code)
-    print(tokens)
-    sharps, tokens = macro_replace(sharps, tokens)
-    code = '\n'.join(sharps) + '\n' + gen_code(tokens)
+    code = post_process(code)
     code = open('../../../include/test_out2.cpp', 'w').write(code)

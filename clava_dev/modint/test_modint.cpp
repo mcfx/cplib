@@ -23,10 +23,38 @@ template<typename T,T P,typename maxCalcType=long long>struct Mint
     Mint&operator*=(Mint){return*this;}
     Mint&operator/=(Mint){return*this;}
     Mint&operator=(Mint){return*this;}
-    static Mint mod(maxCalcType x){return Mint((x%P+P)%P);}
+    static Mint mod(maxCalcType x){return x;}
     //operator T()const{return v;}
     T val()const{return v;}
-};// modint end
+};
+
+template<typename T=int,T P=1000000000,typename maxCalcType=long long,T X=0>struct Mint_dyn
+{
+    T v;
+    Mint_dyn(){}
+    Mint_dyn(T){}
+    Mint_dyn operator+(Mint_dyn)const{return v;}
+    Mint_dyn operator-(Mint_dyn)const{return v;}
+    Mint_dyn operator*(Mint_dyn)const{return v;}
+    Mint_dyn operator/(Mint_dyn)const{return v;}
+    Mint_dyn operator+(T)const{return v;}
+    Mint_dyn operator-(T)const{return v;}
+    Mint_dyn operator*(T)const{return v;}
+    Mint_dyn operator/(T)const{return v;}
+    friend Mint_dyn operator+(T,Mint_dyn o){return o.v;}
+    friend Mint_dyn operator-(T,Mint_dyn o){return o.v;}
+    friend Mint_dyn operator*(T,Mint_dyn o){return o.v;}
+    friend Mint_dyn operator/(T,Mint_dyn o){return o.v;}
+    Mint_dyn&operator+=(Mint_dyn){return*this;}
+    Mint_dyn&operator-=(Mint_dyn){return*this;}
+    Mint_dyn&operator*=(Mint_dyn){return*this;}
+    Mint_dyn&operator/=(Mint_dyn){return*this;}
+    Mint_dyn&operator=(Mint_dyn){return*this;}
+    static Mint_dyn mod(T x){return x;}
+    //operator T()const{return v;}
+    T val()const{return v;}
+};
+// modint end
 
 typedef Mint<int,998244353,__int128_t> mint;
 
@@ -76,6 +104,21 @@ int main()
 
 struct test{mint d;};
 
+typedef Mint_dyn<int,1000000000,long long,131205461> mint2;
+
+struct uuu
+{
+    mint s[3];
+	mint&operator[](int x){return s[x];}
+	const mint&operator[](int x)const{return s[x];}
+	void operator*=(const uuu&o)
+	{
+		//fo0(i,4)s[i]=(s[i]+o.s[i])%P;
+		mint t[4];
+		t[0]=s[0]*o[0];
+    }
+};
+
 int main()
 {
     mint c;
@@ -90,4 +133,10 @@ int main()
     //Mint<int,P> f;
     //typedef Mint<int,P> mint2;
     //mint2 g;
+
+    mint2 x;
+    x+1;
+
+    uuu y,z;
+    y*=z;
 }

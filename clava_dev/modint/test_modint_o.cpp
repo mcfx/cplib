@@ -52,6 +52,21 @@ int main()
 
 struct test{mint d;};
 
+typedef Mint_dyn<int,1000000000,long long,131205461> mint2;
+
+struct uuu
+{
+    mint s[3];
+	mint&operator[](int x){return s[x];}
+	const mint&operator[](int x)const{return s[x];}
+	void operator*=(const uuu&o)
+	{
+		//fo0(i,4)s[i]=(s[i]+o.s[i])%P;
+		mint t[4];
+		t[0]=s[0]*o[0];
+    }
+};
+
 int main()
 {
     mint c;
@@ -66,4 +81,10 @@ int main()
     //Mint<int,P> f;
     //typedef Mint<int,P> mint2;
     //mint2 g;
+
+    mint2 x;
+    x+1;
+
+    uuu y,z;
+    y*=z;
 }

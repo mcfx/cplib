@@ -25,6 +25,7 @@ def import_file(fn):
     fix_call(mod, 'get_dummy_cpp_code', '')
     fix_call(mod, 'get_lara_code', ('', '', 0))
     fix_call(mod, 'post_process_priority', None)
+    fix_call(mod, 'pragma_callbacks', {})
     return mod
 
 
