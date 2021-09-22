@@ -38,13 +38,13 @@ function inlineCall($call) {
 	var $stmt = stmtParent($call);
 	if (typeof($stmt) == "undefined") return;
 	var code = $function.userField('inlinedCode'), globalVarUsing = $function.userField('globalVarUsing');
-	var oretName = $function.userField('retName'), retName = 'F'+$call.line+'_'+$call.column+'_';
+	var oretName = $function.userField('retName'), retName = '_CPLTMP_R'+$call.line+'_'+$call.column+'_';
 
 	var declCode = '', declRetCode = '';
-	if ($function.returnType.code != 'void') declRetCode += $function.returnType.code+' _R'+retName+';';
+	if ($function.returnType.code != 'void') declRetCode += $function.returnType.code+' '+retName+';';
 	var argsCode = '', i = 0;
 	for (var param of $function.params) {
-		var tname = '_A'+i+'_'+$call.line+'_'+$call.column;
+		var tname = '_CPLTMP_A'+i+'_'+$call.line+'_'+$call.column;
 		declCode += param.type.code+' '+tname+'='+$call.args[i].code+';';
 		argsCode += param.code+'='+tname+';';
 		i++;
@@ -52,7 +52,7 @@ function inlineCall($call) {
 	code = code.replace(new RegExp(oretName, 'g'), retName);
 	
 	$stmt.insertBefore(declRetCode+'{'+declCode+'do{'+argsCode+globalVarUsing+code+'}while(0);}');
-	if (declRetCode != '') $call.replaceWith('_R'+retName); else $call.replaceWith('');
+	if (declRetCode != '') $call.replaceWith(retName); else $call.replaceWith('');
 }
 
 aspectdef inlineFunctions
@@ -82,12 +82,12 @@ aspectdef inlineFunctions
 			for (var $call of $function.descendants('call')) {
 				inlineCall($call);
 			}
-			var retName = '_F_'+randstr(10)+'_';
+			var retName = '_R_'+randstr(10)+'_';
 			var originalCode = $function.body.code;
 			for (var stmt of $function.descendants('returnStmt')) {
 				var rexpr = stmt.returnExpr, co = '{';
 				if (typeof(rexpr) != "undefined") {
-					co += '_R'+retName+'='+rexpr.code+';';
+					co += retName+'='+rexpr.code+';';
 				}
 				//co += 'goto _G'+retName+';}';
 				co += 'break;}';
