@@ -170,7 +170,7 @@ function processMod(node, modConfig, forceMod){
 						minModCnt = modCnt;
 						var tp = getBitsType(rawBits, nl<0), utp = getBitsType(rawBits, false);
 						var code = '(('+tp+')('+lt[3]+')'+kop+'('+tp+')('+rc+'))';
-						var code = '(('+(tp!=utp?'('+utp+')':'')+code+(lshift==0?'':'+'+getLiteral(lshift * modConfig[1]))+')%'+modConfig[3]+')';
+						var code = '('+getBitsType(modConfig[0], false)+')(('+(tp!=utp?'('+utp+')':'')+code+(lshift==0?'':'+'+getLiteral(lshift * modConfig[1]))+')%'+modConfig[3]+')';
 						res = [BigInt(0), modConfig[1] - BigInt(1), modCnt, code, lt[4]];
 					}
 				}
