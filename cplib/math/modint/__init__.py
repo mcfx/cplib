@@ -6,7 +6,7 @@ path = os.path.dirname(__file__)
 
 def get_lara_code():
     s = open(os.path.join(path, 'modint.lara')).read()
-    return s[:s.find('aspectdef main')], 'applyModint'
+    return [(s[:s.find('aspectdef main')], 'applyModint', 1000, -1)]  # must be first, since clava breaks template
 
 
 def get_lara_cpp_code():
