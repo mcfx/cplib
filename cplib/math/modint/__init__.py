@@ -53,5 +53,5 @@ def post_process_priority():
 
 def post_process(code, storage):
     for dn, mod in storage.items():
-        code = code.replace(dn, '0', 1).replace(dn, mod)
+        code = code.replace(dn, mod)
     return code
