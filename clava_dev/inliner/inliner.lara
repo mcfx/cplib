@@ -28,20 +28,16 @@ function stmtParent(x) {
 }
 
 function inlineCall($call) {
-	var labels = [];
-	for (var icall of $call.descendants('call')) {
-		var tl = inlineCall(icall);
-		if (tl) for (var label of tl) {
-			labels.push(label);
-		}
-	}
 	var $function = $call.function;
 	//println($function.astId+'|'+$function.userField('inline')+'|'+$function.userField('inlinedCode')+'|'+$function.children);
-	if ($call.userField('inlined') || !$function.userField('inline')) return labels;
+	if ($call.userField('inlined') || !$function.userField('inline')) return;
+	for (var icall of $call.descendants('call')) {
+		inlineCall(icall);
+	}
 	$call.setUserField('inlined', true);
 	var $stmt = stmtParent($call);
-	if (typeof($stmt) == "undefined") return labels;
-	var code = $function.userField('inlinedCode'), globalVarUsing = $function.userField('globalVarUsing'), gotoLabels = $function.userField('gotoLabels');
+	if (typeof($stmt) == "undefined") return;
+	var code = $function.userField('inlinedCode'), globalVarUsing = $function.userField('globalVarUsing');
 	var oretName = $function.userField('retName'), retName = 'F'+$call.line+'_'+$call.column+'_';
 
 	var declCode = '', declRetCode = '';
@@ -54,17 +50,9 @@ function inlineCall($call) {
 		i++;
 	}
 	code = code.replace(new RegExp(oretName, 'g'), retName);
-	labels.push('_G'+retName);
-	for (var label of gotoLabels) {
-		var nlabel = '_I'+retName+labels.length+'_';
-		code = code.replace(new RegExp(label, 'g'), nlabel);
-		labels.push(nlabel);
-	}
 	
-	$stmt.insertBefore(declRetCode+'{'+declCode+'{'+argsCode+globalVarUsing+code+'}_G'+retName+':;}');
+	$stmt.insertBefore(declRetCode+'{'+declCode+'do{'+argsCode+globalVarUsing+code+'}while(0);}');
 	if (declRetCode != '') $call.replaceWith('_R'+retName); else $call.replaceWith('');
-
-	return labels;
 }
 
 aspectdef inlineFunctions
@@ -91,12 +79,8 @@ aspectdef inlineFunctions
 			//println($function.returnType.code);
 			/*println($function.qualifiedPrefix+'|'+$function.params);
 			println($function.body.children);*/
-			var labels = [];
 			for (var $call of $function.descendants('call')) {
-				var tl = inlineCall($call);
-				if (tl) for (var label of tl) {
-					labels.push(label);
-				}
+				inlineCall($call);
 			}
 			var retName = '_F_'+randstr(10)+'_';
 			var originalCode = $function.body.code;
@@ -105,7 +89,8 @@ aspectdef inlineFunctions
 				if (typeof(rexpr) != "undefined") {
 					co += '_R'+retName+'='+rexpr.code+';';
 				}
-				co += 'goto _G'+retName+';}';
+				//co += 'goto _G'+retName+';}';
+				co += 'break;}';
 				stmt.replaceWith(co);
 			}
 			var code = $function.body.code;
@@ -126,7 +111,6 @@ aspectdef inlineFunctions
 			//println(code);
 			$function.setUserField('inlinedCode', code);
 			$function.setUserField('retName', retName);
-			$function.setUserField('gotoLabels', labels);
 			//println(code);
 		}
 	end
