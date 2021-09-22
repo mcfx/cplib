@@ -113,8 +113,7 @@ def macro_replace(sharps, tokens):
         if token[0] in tokenchars:
             token_names.add(token)
 
-    def randname():
-        curlen = 1
+    def randname(curlen=1):
         curtm = 0
         while True:
             s = random.choice(string.ascii_letters)
@@ -127,6 +126,22 @@ def macro_replace(sharps, tokens):
             if curtm == 10:
                 curtm = 0
                 curlen += 1
+
+    tn = []
+    td = {}
+    for t in tokens:
+        if not t.startswith('_CPLTMP_'):
+            tn.append(t)
+            continue
+        if t in td:
+            tn.append(td[t])
+            continue
+        u = randname(2)
+        td[t] = u
+        tn.append(u)
+        token_names.add(u)
+        token_names.remove(t)
+    tokens = tn
 
     while True:
         posd = {}
