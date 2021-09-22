@@ -1,4 +1,4 @@
-import os, shutil, subprocess
+import os, shutil, argparse, subprocess
 import config
 from util import randstr
 from lib import libs
@@ -108,7 +108,11 @@ def pre_pragma_use(code, used_libs, libs_storage):
 
 
 if __name__ == '__main__':
-    code = open('../include/test.cpp').read().replace('\r', '\n')
+    parser = argparse.ArgumentParser(description='CPLib Compiler')
+    parser.add_argument('source_file', help='Source file')
+    parser.add_argument('-o', dest='output_file', help='Output file')
+    args = parser.parse_args()
+    code = open(args.source_file).read().replace('\r', '\n')
     prefix_comments = '// Original Code:\n\n' + '\n'.join(map(lambda x: '// ' + x.replace('\t', ' ' * 4), code.split('\n'))) + '\n' * 2
     used_libs = set()
     libs_storage = {}
@@ -117,4 +121,4 @@ if __name__ == '__main__':
     code = post_process(code, used_libs, libs_storage)
     # print(code)
     code = prefix_comments + code
-    open('../include/test_out.cpp', 'w').write(code)
+    open(args.output_file, 'w').write(code)
