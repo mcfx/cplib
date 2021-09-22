@@ -163,6 +163,12 @@ namespace test3
         Mint<char,55> a[4];
         const Mint<char,55> *b=a+2;
     }
+    void test3()
+    {
+        
+    mint a,b;
+    (a*b).val();
+    }
 }
 int main()
 {

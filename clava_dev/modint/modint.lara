@@ -269,7 +269,7 @@ function processMod(node, modConfig, forceMod){
 function processModOut(node){
 	if (node.userField('process_mod')) return null;
 	var mt = mintType(node.type);
-	//println(node.code+'|'+node.type.code+'|'+node);
+	//println(node.code+'|'+node.type.code+'|'+node+'|'+mt);
 	if (mt[0]) {
 		if (node.code == node.type.code) return null;
 		markNeed(mt[1]);
@@ -278,8 +278,10 @@ function processModOut(node){
 	if (node.instanceOf('memberCall')) {
 		// process Mint.val()
 		var child = node.children[0];
-		if (child.memberChainNames[child.memberChainNames.length - 1] == 'val') {
+		//println(child+'@'+child.name);
+		if (child.name == 'val') {
 			var mt = mintType(child.children[0].type);
+			//println(node.code+'|'+mt);
 			if (mt[0]) {
 				node.setUserField('process_mod', true);
 				child.setUserField('process_mod', true);
@@ -345,18 +347,6 @@ aspectdef applyModint
 
 	select vardecl end
 	apply
-		//println($vardecl.type.code+'|'+$vardecl.type+'|'+mintType($vardecl.type));
-		if ($vardecl.type.code=='Mint<unsigned short, 55665>'/*||$vardecl.type.code=='mint[4]'*/) {
-			println('');
-			println($vardecl.type.kind);
-			println($vardecl.type.getValue('typeAsString'));
-			//$vardecl.setType($vardecl.type.replaceWith('unsigned short'));
-			$vardecl.setType($vardecl.type.firstArgType);
-			//$vardecl.children[0].replaceWith('unsigned short');
-			println($vardecl.children[0]+'|'+$vardecl.children[0].numChildren);
-			println($vardecl.code);
-			println('');
-		}
 		var o = replaceMintType($vardecl.type);
 		$vardecl.setType(o);
 	end
