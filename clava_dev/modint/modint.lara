@@ -243,7 +243,7 @@ function processMod(node, modConfig, forceMod){
 			if (mt[0]) {
 				child.setUserField('process_mod', true);
 				var tp = getBitsType(mt[1][0]);
-				return [BigInt(0), modConfig[1] - BigInt(1), 0, '('+tp+')('+child.children[0].code+')', 'RVALUE'];
+				return [BigInt(0), modConfig[1] - BigInt(1), 0, '('+tp+')('+processMod(child.children[0], mt[1], true)[3]+')', 'RVALUE'];
 			}
 		}
 		return [BigInt(0), modConfig[1] - BigInt(1), 0, node.code, node.code];
@@ -286,7 +286,7 @@ function processModOut(node){
 				node.setUserField('process_mod', true);
 				child.setUserField('process_mod', true);
 				var tp = getBitsType(mt[1][0]);
-				return '('+tp+')('+child.children[0].code+')';
+				return '('+tp+')('+processMod(child.children[0], mt[1], true)[3]+')';
 			}
 		}
 	}
