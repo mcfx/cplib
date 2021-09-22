@@ -5,7 +5,7 @@ path = os.path.dirname(__file__)
 
 def get_lara_code():
     s = open(os.path.join(path, 'comments.lara')).read()
-    return s[:s.find('aspectdef main')], 'removeComments', 1000
+    return [(s[:s.find('aspectdef main')], 'removeComments', 0, 1000)]
 
 
 spaces = ' \t'
