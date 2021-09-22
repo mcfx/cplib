@@ -32,7 +32,7 @@ function fixTemplateArgs(x,isdyn){
 }
 
 function mintType(x){
-	if(x.kind=='RecordType'){
+	if(x.kind=='RecordType'||x.kind=='TemplateSpecializationType'){
 		var typeDef=x.getValue('typeAsString');
 		//println('typeDefinition:'+typeDef);
 		if(typeDef.startsWith('Mint<')&&typeDef.endsWith('>')){
@@ -105,7 +105,7 @@ function markNeed(modConfig) {
 
 // returns: [l, r, modCnt, code, innerRef]
 function processMod(node, modConfig, forceMod){
-	//println(node.code + '|' + modConfig + '|' + forceMod);
+	//println(node.code + '|' + node + '|' + modConfig + '|' + forceMod);
 	node.setUserField('process_mod', true);
 	var fieldKey = 'process_mod_'+(+forceMod);
 	if(node.userField(fieldKey))return node.userField(fieldKey);
@@ -235,7 +235,19 @@ function processMod(node, modConfig, forceMod){
 		res[3] = res[4] + '=(' + res[3] +')';
 		node.setUserField(fieldKey, res);
 		return res;
-	} else if(node.instanceOf('call') || node.instanceOf('memberCall')) {
+	} else if (node.instanceOf('memberCall')) {
+		// process Mint.val()
+		var child = node.children[0];
+		if (child.memberChainNames[child.memberChainNames.length - 1] == 'val') {
+			var mt = mintType(child.children[0].type);
+			if (mt[0]) {
+				child.setUserField('process_mod', true);
+				var tp = getBitsType(mt[1][0]);
+				return [BigInt(0), modConfig[1] - BigInt(1), 0, '('+tp+')('+child.children[0].code+')', 'RVALUE'];
+			}
+		}
+		return [BigInt(0), modConfig[1] - BigInt(1), 0, node.code, node.code];
+	} else if(node.instanceOf('call')) {
 		return [BigInt(0), modConfig[1] - BigInt(1), 0, node.code, node.code];
 	} else if(node.instanceOf('varref') || node.instanceOf('binaryOp')) {
 		return [BigInt(0), modConfig[1] - BigInt(1), 0, node.code, node.code];
@@ -257,10 +269,24 @@ function processMod(node, modConfig, forceMod){
 function processModOut(node){
 	if (node.userField('process_mod')) return null;
 	var mt = mintType(node.type);
+	//println(node.code+'|'+node.type.code+'|'+node);
 	if (mt[0]) {
 		if (node.code == node.type.code) return null;
 		markNeed(mt[1]);
 		return processMod(node, mt[1], true)[3];
+	}
+	if (node.instanceOf('memberCall')) {
+		// process Mint.val()
+		var child = node.children[0];
+		if (child.memberChainNames[child.memberChainNames.length - 1] == 'val') {
+			var mt = mintType(child.children[0].type);
+			if (mt[0]) {
+				node.setUserField('process_mod', true);
+				child.setUserField('process_mod', true);
+				var tp = getBitsType(mt[1][0]);
+				return '('+tp+')('+child.children[0].code+')';
+			}
+		}
 	}
 	if (node.instanceOf('call') && (node.children[0].type.code == 'Mint & (Mint)' || node.children[0].type.code == 'Mint_dyn & (Mint_dyn)')) {
 		var funcCode = node.children[0].code;
@@ -279,6 +305,32 @@ function processModOut(node){
 	return null;
 }
 
+function replaceMintType($type){
+	if ($type.instanceOf('templateSpecializationType')) {
+		var mt = mintType($type);
+		if (!mt[0]) return $type;
+		return $type.replaceWith($type.firstArgType);
+	} else if ($type.instanceOf('builtinType')) {
+		return $type;
+	} else if ($type.instanceOf('typedefType')) {
+		//return replaceMintType($type.underlyingType);
+		return $type;
+	} else if ($type.instanceOf('qualType')) {
+		return $type.setUnderlyingType($type.unqualifiedType,replaceMintType($type.unqualifiedType));
+	} else if ($type.instanceOf('tagType')) {
+		return $type;
+	} else if ($type.instanceOf('arrayType')) {
+		return $type.setUnderlyingType($type.elementType,replaceMintType($type.elementType));
+	} else if ($type.instanceOf('pointerType')) {
+		return $type.setUnderlyingType($type.pointee,replaceMintType($type.pointee));
+	} else {
+		// some types don't work, like std::vector<Mint<int, 1>>
+		// use typedef to avoid
+		//println('ERROR: unknown type '+$type+'|'+$type.code);
+		return $type;
+	}
+}
+
 aspectdef applyModint
 	select expr end
 	apply
@@ -291,6 +343,36 @@ aspectdef applyModint
 		}
 	end
 
+	select vardecl end
+	apply
+		//println($vardecl.type.code+'|'+$vardecl.type+'|'+mintType($vardecl.type));
+		if ($vardecl.type.code=='Mint<unsigned short, 55665>'/*||$vardecl.type.code=='mint[4]'*/) {
+			println('');
+			println($vardecl.type.kind);
+			println($vardecl.type.getValue('typeAsString'));
+			//$vardecl.setType($vardecl.type.replaceWith('unsigned short'));
+			$vardecl.setType($vardecl.type.firstArgType);
+			//$vardecl.children[0].replaceWith('unsigned short');
+			println($vardecl.children[0]+'|'+$vardecl.children[0].numChildren);
+			println($vardecl.code);
+			println('');
+		}
+		var o = replaceMintType($vardecl.type);
+		$vardecl.setType(o);
+	end
+
+	select typedefDecl end
+	apply
+		var o = replaceMintType($typedefDecl.type);
+		$typedefDecl.setType(o);
+	end
+
+	select function end
+	apply
+		var o = replaceMintType($function.returnType);
+		$function.setReturnType(o);
+	end
+
 	select struct{'Mint_dyn'} end
 	apply
 		$struct.parent.replaceWith('');
@@ -298,20 +380,7 @@ aspectdef applyModint
 
 	select struct{'Mint'} end
 	apply
-		var code = 'template<typename T,T P,typename U=T>struct Mint{};template<typename T,T P,typename U=T,T X=0>struct Mint_dyn{};';
-		for (var bu in needModint) {
-			var bt = bu.split('_');
-			var b = parseInt(bt[0]), isdyn = !!parseInt(bt[1]);
-			for (var sg of [true, false]) {
-				var tp = getBitsType(b, sg);
-				if (isdyn) {
-					code += %{template<[[tp]] P,typename U,[[tp]] X>struct Mint_dyn<[[tp]],P,U,X>{[[tp]] v;Mint_dyn(){}Mint_dyn([[tp]] x):v(x){}operator [[tp]]()const{return v;}[[tp]] val()const{return v;}};}%;
-				} else {
-					code += %{template<[[tp]] P,typename U>struct Mint<[[tp]],P,U>{[[tp]] v;Mint(){}Mint([[tp]] x):v(x){}operator [[tp]]()const{return v;}[[tp]] val()const{return v;}};}%;
-				}
-			}
-		}
-		$struct.parent.replaceWith(code);
+		$struct.parent.replaceWith('');
 	end
 
 	select program.file end
@@ -331,6 +400,11 @@ aspectdef applyModint
 			}
 		}
 	end
+
+	/*select program.file end
+	apply
+		$file.replaceWith('int main(){}');
+	end*/
 end
 
 aspectdef main

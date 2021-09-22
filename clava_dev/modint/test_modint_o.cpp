@@ -6,7 +6,8 @@
 
 typedef Mint<int,998244353,__int128_t> mint;
 
-/*mint s[100];
+namespace test1{
+mint s[100];
 
 mint work(mint x){
     return x+1;
@@ -48,8 +49,10 @@ int main()
     c+c+c-a;
 
     int uuu=c.val();
-}*/
+}
+}
 
+namespace test2{
 struct test{mint d;};
 
 typedef Mint_dyn<int,1000000000,long long,131205461> mint2;
@@ -90,4 +93,23 @@ int main()
 
     x=x/(x/233);
     c=c/(c/233);
+}
+}
+namespace test3
+{
+    Mint<int,111> test(Mint<long long,55>a)
+    {
+        return a.val();
+    }
+
+    void test2()
+    {
+        Mint<char,55> a[4];
+        const Mint<char,55> *b=a+2;
+    }
+}
+int main()
+{
+    test1::main();
+    test2::main();
 }
