@@ -7,23 +7,15 @@ SRC_ROOT = os.path.dirname(os.path.abspath(__file__))
 LIB_ROOT = os.path.join(os.path.dirname(SRC_ROOT), 'cplib')
 
 
-def clava_work(code, used_libs):
+def clava_pass(code, lara_aspects):
     path = '/tmp/cplib_' + randstr()
     os.mkdir(path)
     os.chdir(path)
     shutil.copyfile(SRC_ROOT + '/assets/clava.config', path + '/clava.config')
     open(path + '/code.cpp', 'w').write(code)
-
-    lara_code = []
-    lara_aspects = []
-    for libname in used_libs:
-        lib = libs[libname]
-        lc, la, opt = lib.get_lara_code()
-        if lc:
-            lara_code.append(lc)
-            lara_aspects.append((opt, la))
-    lara_aspects.sort()
-    lara_calls = '\n'.join(map(lambda x: '    call %s();' % x[1], lara_aspects))
+    lara_calls = '\n'.join(map(lambda x: '    call %s();' % x[0], lara_aspects))
+    print('clava_pass:', *(x[0] for x in lara_aspects))
+    lara_code = [x[1] for x in lara_aspects]
     lara_code.append('''aspectdef main
 %s
 end
@@ -35,6 +27,23 @@ end
     os.chdir(SRC_ROOT)
     shutil.rmtree(path)
     return res
+
+
+def clava_work(code, used_libs):
+    lara_aspects = {}
+    for libname in used_libs:
+        lib = libs[libname]
+        for aspect in lib.get_lara_code():
+            lc = aspect[0]
+            la = aspect[1]
+            prio = aspect[2] if len(aspect) > 2 else 0
+            _pass = aspect[3] if len(aspect) > 3 else 0
+            if _pass not in lara_aspects:
+                lara_aspects[_pass] = []
+            lara_aspects[_pass].append((prio, la, lc))
+    for _pass in sorted(lara_aspects.keys()):
+        code = clava_pass(code, [(x[1], x[2]) for x in sorted(lara_aspects[_pass])])
+    return code
 
 
 def post_process(code, used_libs, libs_storage):
@@ -67,8 +76,8 @@ def pre_pragma_use(code, used_libs, libs_storage):
     while i < len(lines):
         line = lines[i]
         if line.startswith('#pragma cplib use '):
-            libname = line[18:]
-            res_lines.append(get_lara_cpp_code(libname))
+            for libname in line[18:].split():
+                res_lines.append(get_lara_cpp_code(libname))
         elif line.startswith('#include"cplib/'):
             libname = line.strip()[15:-5].replace('/', '.')
             res_lines.append(get_lara_cpp_code(libname))
@@ -89,7 +98,8 @@ def pre_pragma_use(code, used_libs, libs_storage):
                 else:
                     raise Exception('unknown pragma callback type')
             else:
-                raise Exception('unknown pragma')
+                res_lines.append(line)
+                #raise Exception('unknown pragma')
         else:
             res_lines.append(line)
         i += 1
